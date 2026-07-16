@@ -41,6 +41,7 @@ const shareLink = document.getElementById("shareLink");
 const copyBtn = document.getElementById("copyBtn");
 const waitingText = document.getElementById("waitingText");
 const lobbyStatus = document.getElementById("lobbyStatus");
+const lobbyDebug = document.getElementById("lobbyDebug");
 
 // ---- State ----
 let handLandmarker = null;
@@ -77,8 +78,10 @@ const peerOptions = {
       {
         urls: [
           "turn:openrelay.metered.ca:80",
+          "turn:openrelay.metered.ca:80?transport=tcp",
           "turn:openrelay.metered.ca:443",
           "turn:openrelay.metered.ca:443?transport=tcp",
+          "turns:openrelay.metered.ca:443?transport=tcp",
         ],
         username: "openrelayproject",
         credential: "openrelayproject",
@@ -211,6 +214,44 @@ function send(obj) {
   if (dataConn && dataConn.open) dataConn.send(obj);
 }
 
+// ---- Connection diagnostics ----
+const iceStats = {};
+function renderDebug() {
+  const lines = Object.entries(iceStats).map(([label, s]) => {
+    return `${label}: ${s.state} | relay:${s.relay} srflx:${s.srflx} host:${s.host}`;
+  });
+  lobbyDebug.textContent = lines.join("\n");
+}
+function attachIceDebug(pc, label) {
+  if (!pc || iceStats[label]) return;
+  iceStats[label] = { state: "new", relay: 0, srflx: 0, host: 0 };
+  pc.addEventListener("icecandidate", (e) => {
+    if (e.candidate && e.candidate.candidate) {
+      const t = (e.candidate.candidate.match(/ typ (\w+)/) || [])[1];
+      if (t && iceStats[label][t] !== undefined) iceStats[label][t]++;
+      renderDebug();
+    }
+  });
+  const onState = () => {
+    iceStats[label].state = pc.iceConnectionState;
+    renderDebug();
+  };
+  pc.addEventListener("iceconnectionstatechange", onState);
+  onState();
+}
+function watchPeerConnection(getter, label) {
+  let tries = 0;
+  const iv = setInterval(() => {
+    const pc = getter();
+    if (pc) {
+      clearInterval(iv);
+      attachIceDebug(pc, label);
+    } else if (++tries > 50) {
+      clearInterval(iv);
+    }
+  }, 100);
+}
+
 function hostGame() {
   isHost = true;
   const roomId = makeRoomId();
@@ -222,10 +263,14 @@ function hostGame() {
     showShareArea();
     setLobbyStatus(`Game code: ${id}`);
   });
-  peer.on("connection", (conn) => setupDataConn(conn));
+  peer.on("connection", (conn) => {
+    setupDataConn(conn);
+    watchPeerConnection(() => conn.peerConnection, "data");
+  });
   peer.on("call", (call) => {
     call.answer(localStream);
     call.on("stream", setRemoteStream);
+    watchPeerConnection(() => call.peerConnection, "media");
   });
   peer.on("error", handlePeerError);
 }
@@ -237,20 +282,26 @@ function joinGame(roomId) {
     setLobbyStatus("Connecting to host…");
     const conn = peer.connect(roomId, { reliable: true });
     setupDataConn(conn);
+    watchPeerConnection(() => conn.peerConnection, "data");
     const call = peer.call(roomId, localStream);
     call.on("stream", setRemoteStream);
     call.on("error", (e) => console.error("media call error", e));
+    watchPeerConnection(() => call.peerConnection, "media");
 
     // If we can't establish the P2P link in time, tell the user why.
     clearTimeout(connectTimeout);
     connectTimeout = setTimeout(() => {
       if (!connected) {
-        setLobbyStatus(
-          "Couldn't connect. Make sure the host still has their tab open, " +
-            "and that you both have a working internet connection. On very " +
-            "restrictive networks (some office/school Wi‑Fi), try a different network.",
-          true
-        );
+        const relayFound = (iceStats.data?.relay || 0) > 0;
+        let msg =
+          "Couldn't connect. The host must keep the game tab OPEN and in the " +
+          "FOREGROUND (don't switch apps or let the screen lock). ";
+        msg += relayFound
+          ? "TURN relay is working on your side, so the host is likely not " +
+            "responding — ask them to reopen the game and send a fresh link."
+          : "No TURN relay candidates formed on this network — it may be " +
+            "blocking relays. Try a different network (e.g. mobile hotspot).";
+        setLobbyStatus(msg, true);
       }
     }, 20000);
   });
