@@ -73,9 +73,21 @@ const peerOptions = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:global.stun.twilio.com:3478" },
+      // Free public TURN relays (fallback when direct/STUN fails)
+      {
+        urls: [
+          "turn:openrelay.metered.ca:80",
+          "turn:openrelay.metered.ca:443",
+          "turn:openrelay.metered.ca:443?transport=tcp",
+        ],
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
     ],
   },
 };
+
+let connectTimeout = null;
 
 // =====================================================================
 // Model + camera
@@ -227,6 +239,20 @@ function joinGame(roomId) {
     setupDataConn(conn);
     const call = peer.call(roomId, localStream);
     call.on("stream", setRemoteStream);
+    call.on("error", (e) => console.error("media call error", e));
+
+    // If we can't establish the P2P link in time, tell the user why.
+    clearTimeout(connectTimeout);
+    connectTimeout = setTimeout(() => {
+      if (!connected) {
+        setLobbyStatus(
+          "Couldn't connect. Make sure the host still has their tab open, " +
+            "and that you both have a working internet connection. On very " +
+            "restrictive networks (some office/school Wi‑Fi), try a different network.",
+          true
+        );
+      }
+    }, 20000);
   });
   peer.on("error", handlePeerError);
 }
@@ -265,6 +291,7 @@ function handlePeerError(err) {
 
 function onConnected() {
   connected = true;
+  clearTimeout(connectTimeout);
   lobby.classList.add("hidden");
   playBtn.disabled = false;
   resetBtn.disabled = false;
