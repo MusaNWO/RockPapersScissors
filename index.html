@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Paper Scissors — 2 Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>Rock <span>·</span> Paper <span>·</span> Scissors</h1>
+      <p class="subtitle">Two players, two cameras, real hand gestures</p>
+    </header>
+
+    <main class="board">
+      <!-- Player side -->
+      <section class="side player-side">
+        <div class="side-label"><span id="youName">You</span></div>
+        <div class="camera-wrap">
+          <video id="video" playsinline autoplay muted></video>
+          <canvas id="overlay"></canvas>
+          <div id="detectedBadge" class="detected-badge">—</div>
+        </div>
+      </section>
+
+      <!-- Center -->
+      <section class="center">
+        <div id="countdown" class="countdown"></div>
+        <div id="resultText" class="result-text">Waiting to connect…</div>
+        <div class="scoreboard">
+          <div class="score">
+            <span class="score-num" id="scorePlayer">0</span>
+            <span class="score-label">You</span>
+          </div>
+          <div class="score-vs">vs</div>
+          <div class="score">
+            <span class="score-num" id="scoreCpu">0</span>
+            <span class="score-label">Rival</span>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="playBtn" class="btn btn-primary" disabled>Play round</button>
+          <button id="resetBtn" class="btn btn-ghost" disabled>Reset score</button>
+        </div>
+      </section>
+
+      <!-- Opponent side -->
+      <section class="side opponent-side">
+        <div class="side-label"><span id="rivalName">Rival</span></div>
+        <div class="camera-wrap">
+          <video id="remoteVideo" playsinline autoplay></video>
+          <div id="rivalMoveBadge" class="detected-badge">—</div>
+          <div id="opponentPlaceholder" class="camera-hint">
+            <p>Waiting for opponent…</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="legend">
+        <span>✊ Rock</span>
+        <span>✋ Paper</span>
+        <span>✌️ Scissors</span>
+      </div>
+      <div id="status" class="status">Loading…</div>
+    </footer>
+  </div>
+
+  <!-- Lobby overlay -->
+  <div id="lobby" class="lobby">
+    <div class="lobby-card">
+      <h2 id="lobbyTitle">Play with a friend</h2>
+      <p id="lobbySub" class="lobby-sub">Create a game and send the link, or join one you were sent.</p>
+
+      <div id="nameRow" class="lobby-field">
+        <label for="nameInput">Your name</label>
+        <input id="nameInput" type="text" maxlength="16" placeholder="Player 1" autocomplete="off" />
+      </div>
+
+      <!-- Choice buttons -->
+      <div id="lobbyChoice" class="lobby-actions">
+        <button id="createBtn" class="btn btn-primary btn-block">Create a game</button>
+        <button id="joinBtn" class="btn btn-ghost btn-block">Join a game</button>
+      </div>
+
+      <!-- Join code entry -->
+      <div id="joinArea" class="lobby-field hidden">
+        <label for="roomInput">Enter game code or paste link</label>
+        <input id="roomInput" type="text" placeholder="e.g. brave-otter-42" autocomplete="off" />
+        <button id="joinGoBtn" class="btn btn-primary btn-block">Join now</button>
+      </div>
+
+      <!-- Waiting / share -->
+      <div id="shareArea" class="hidden">
+        <p class="lobby-sub">Share this link with your friend:</p>
+        <div class="share-row">
+          <input id="shareLink" type="text" readonly />
+          <button id="copyBtn" class="btn btn-ghost">Copy</button>
+        </div>
+        <div class="waiting">
+          <div class="spinner"></div>
+          <span id="waitingText">Waiting for opponent to join…</span>
+        </div>
+      </div>
+
+      <div id="lobbyStatus" class="lobby-status"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
